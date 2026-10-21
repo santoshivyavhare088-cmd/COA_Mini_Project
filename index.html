@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I/O Data Transfer Simulator – COA CO5 Micro Project</title>
+<style>
+:root{--bg:#edf1f5;--card:#fff;--ink:#17233b;--mute:#5d6b82;--line:#d3dae4;
+--work:#2f6fed;--poll:#d64545;--xfer:#1f9d6b;--ovh:#e0a100;--setup:#7a5af8;--stall:#8892a0;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45}
+header{background:var(--ink);color:#fff;padding:18px 24px}
+header h1{margin:0;font-size:1.4rem;font-weight:600}
+header p{margin:4px 0 0;color:#aab6cc;font-size:.9rem}
+.wrap{max-width:1100px;margin:0 auto;padding:18px;display:grid;grid-template-columns:280px 1fr;gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px}
+.card h2{margin:0 0 10px;font-size:1rem}
+.modes{display:grid;gap:6px;margin-bottom:12px}
+.modes label{border:1px solid var(--line);border-radius:6px;padding:8px 10px;cursor:pointer;font-size:.92rem}
+.modes input{margin-right:8px}
+.modes label:has(input:checked){border-color:var(--work);background:#eaf0fe;font-weight:600}
+.param{margin:10px 0}
+.param div{display:flex;justify-content:space-between;font-size:.88rem}
+input[type=range]{width:100%}
+.btns{display:flex;gap:6px;margin-top:14px}
+button{font:inherit;padding:8px 14px;border:1px solid var(--ink);background:#fff;color:var(--ink);border-radius:6px;cursor:pointer}
+button.main{background:var(--ink);color:#fff}
+button:hover{opacity:.85}
+button:disabled{opacity:.4;cursor:default}
+.info{font-size:.85rem;color:var(--mute);margin-top:12px}
+.right{display:grid;gap:18px;align-content:start}
+.diagram{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.node{border:2px solid var(--line);border-radius:8px;padding:10px;text-align:center;background:#f7f9fb;transition:.2s;min-height:90px}
+.node h3{margin:0;font-size:.95rem}
+.node small{display:block;color:var(--mute);margin-top:4px;font-size:.78rem}
+.node.hide{opacity:.25}
+.node.work{border-color:var(--work);background:#eaf0fe}
+.node.poll{border-color:var(--poll);background:#fdecec}
+.node.xfer{border-color:var(--xfer);background:#e6f6ef}
+.node.ovh{border-color:var(--ovh);background:#fff6dc}
+.node.setup{border-color:var(--setup);background:#f0ecff}
+.node.stall{border-color:var(--stall);background:#eceef2}
+.mem{display:flex;gap:4px;flex-wrap:wrap;margin-top:12px}
+.mem span{width:32px;height:26px;border:1px solid var(--line);border-radius:4px;font-size:.7rem;display:grid;place-items:center;color:#8f9bb0}
+.mem span.full{background:var(--xfer);color:#fff;border-color:var(--xfer)}
+.now{margin-top:12px;padding:10px 12px;border-left:5px solid var(--line);background:#f4f7fb;border-radius:4px;min-height:48px;font-size:.93rem}
+.tl{display:flex;flex-wrap:wrap;gap:2px}
+.tl i{width:14px;height:20px;border-radius:2px;background:#e3e8ef}
+.tl i.cur{outline:2px solid var(--ink)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.8rem;margin-top:10px}
+.legend span::before{content:"";display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;background:var(--c)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+.stat{background:#f4f7fb;border-radius:6px;padding:8px;text-align:center}
+.stat b{display:block;font-size:1.25rem}
+.stat small{color:var(--mute)}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{background:#f4f7fb}
+.best{color:var(--xfer);font-weight:700}
+.full-row{grid-column:1/-1}
+@media(max-width:860px){.wrap{grid-template-columns:1fr}.diagram{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>I/O Data Transfer Simulator</h1>
+  <p>Computer Organization and Architecture – CO5 Micro Project | Programmed I/O, Interrupt-driven I/O and DMA</p>
+</header>
+
+<div class="wrap">
+  <aside class="card">
+    <h2>Input</h2>
+    <div class="modes">
+      <label><input type="radio" name="mode" value="pio" checked>Programmed I/O (polling)</label>
+      <label><input type="radio" name="mode" value="int">Interrupt-driven I/O</label>
+      <label><input type="radio" name="mode" value="dma">DMA</label>
+    </div>
+    <div class="param"><div><span>Words to transfer</span><b id="vN">6</b></div><input type="range" id="N" min="1" max="12" value="6"></div>
+    <div class="param"><div><span>Device delay per word (cycles)</span><b id="vD">4</b></div><input type="range" id="D" min="1" max="8" value="4"></div>
+    <div class="param"><div><span>Interrupt overhead (cycles)</span><b id="vO">2</b></div><input type="range" id="O" min="1" max="6" value="2"></div>
+    <div class="btns">
+      <button class="main" id="bStep">Step</button>
+      <button id="bPlay">Play</button>
+      <button id="bReset">Reset</button>
+    </div>
+    <p class="info" id="modeInfo"></p>
+  </aside>
+
+  <section class="right">
+    <div class="card">
+      <h2>Block diagram</h2>
+      <div class="diagram">
+        <div class="node" id="nCpu"><h3>CPU</h3><small id="tCpu">Idle</small></div>
+        <div class="node" id="nDma"><h3>DMA controller</h3><small id="tDma">Not used</small></div>
+        <div class="node" id="nDev"><h3>I/O device</h3><small id="tDev">Idle</small></div>
+        <div class="node" id="nMem"><h3>Memory</h3><small id="tMem">0 words stored</small></div>
+      </div>
+      <div class="mem" id="mem"></div>
+      <div class="now" id="now"></div>
+    </div>
+
+    <div class="card">
+      <h2>Cycle timeline</h2>
+      <div class="tl" id="tl"></div>
+      <div class="legend">
+        <span style="--c:var(--work)">CPU useful work</span>
+        <span style="--c:var(--poll)">CPU polling (wasted)</span>
+        <span style="--c:var(--xfer)">CPU moving data</span>
+        <span style="--c:var(--ovh)">Interrupt overhead</span>
+        <span style="--c:var(--setup)">Setup</span>
+        <span style="--c:var(--stall)">CPU stalled (DMA has bus)</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="sCyc">0</b><small>Cycles elapsed</small></div>
+        <div class="stat"><b id="sWords">0</b><small>Words in memory</small></div>
+        <div class="stat"><b id="sWork">0</b><small>CPU useful cycles</small></div>
+        <div class="stat"><b id="sEff">0%</b><small>CPU efficiency</small></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="card full-row">
+    <h2>Comparison for the current inputs (full run)</h2>
+    <table>
+      <thead><tr><th>Method</th><th>Total cycles</th><th>CPU useful cycles</th><th>CPU efficiency</th></tr></thead>
+      <tbody id="cmp"></tbody>
+    </table>
+    <p class="info">CPU efficiency = useful cycles ÷ total cycles. Assumptions: the CPU always has other work to do, moving one word takes 1 cycle, and DMA setup takes 3 cycles.</p>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const NAMES = {pio:"Programmed I/O", int:"Interrupt-driven I/O", dma:"DMA"};
+const INFO = {
+  pio:"The CPU keeps checking the device status until it is ready (busy waiting), then moves the word itself. Simple, but the CPU does no useful work while waiting.",
+  int:"The CPU runs other work while the device prepares data. When a word is ready, the device interrupts the CPU, which saves its state, copies the word, and resumes. Every word costs some interrupt overhead.",
+  dma:"The CPU sets up the DMA controller once. The DMA controller then moves every word to memory by briefly taking the bus, and interrupts the CPU only once at the end."
+};
+const CPU_TXT = {work:"Running main program", poll:"Polling status", xfer:"Moving data", ovh:"Interrupt overhead", setup:"Setting up", stall:"Stalled (DMA has bus)"};
+const DEV_TXT = {prep:"Preparing data", ready:"Data ready", idle:"Idle"};
+const COL = {work:"--work", poll:"--poll", xfer:"--xfer", ovh:"--ovh", setup:"--setup", stall:"--stall"};
+const DMA_SETUP = 3;
+
+// Build the list of clock cycles for one mode
+function build(mode, p){
+  const t = [], {N, D, O} = p;
+  const add = (cpu, msg, store, dev) => t.push({cpu, msg, store: store || 0, dev: dev || "prep"});
+  if(mode === "pio"){
+    add("setup", "CPU sends START command to the device");
+    for(let i = 1; i <= N; i++){
+      for(let k = 1; k <= D; k++) add("poll", "Word " + i + ": device is busy, CPU checks status again (" + k + "/" + D + ")");
+      add("xfer", "Word " + i + ": device ready. CPU reads it and writes it to memory", i, "ready");
+    }
+  } else if(mode === "int"){
+    add("setup", "CPU sends START command and enables interrupts");
+    for(let i = 1; i <= N; i++){
+      for(let k = 1; k <= D; k++) add("work", "Word " + i + ": CPU runs main program while device prepares data (" + k + "/" + D + ")");
+      const before = Math.ceil(O / 2), after = O - before;
+      for(let k = 1; k <= before; k++) add("ovh", "Word " + i + ": device raises interrupt – CPU saves its state and jumps to the ISR (" + k + "/" + before + ")", 0, "ready");
+      add("xfer", "Word " + i + ": ISR copies the word to memory", i, "ready");
+      for(let k = 1; k <= after; k++) add("ovh", "Word " + i + ": CPU restores its state and returns to the main program (" + k + "/" + after + ")", 0, "idle");
+    }
+  } else {
+    for(let k = 1; k <= DMA_SETUP; k++) add("setup", "CPU programs the DMA controller (" + k + "/" + DMA_SETUP + ")", 0, "idle");
+    for(let i = 1; i <= N; i++){
+      for(let k = 1; k <= D; k++) add("work", "Word " + i + ": CPU runs main program while device prepares data (" + k + "/" + D + ")");
+      add("stall", "Word " + i + ": DMA takes the bus for one cycle and moves the word to memory", i, "ready");
+    }
+    for(let k = 1; k <= O; k++) add("ovh", "DMA is done – one completion interrupt (" + k + "/" + O + ")", 0, "idle");
+  }
+  return t;
+}
+
+let mode = "pio", tl = [], cur = 0, timer = null;
+const P = () => ({N:+$("N").value, D:+$("D").value, O:+$("O").value});
+
+function stats(t, upto){
+  const work = t.slice(0, upto).filter(e => e.cpu === "work").length;
+  return {cyc: upto, work, eff: upto ? Math.round(work / upto * 100) : 0};
+}
+
+function reset(){
+  stop();
+  mode = document.querySelector("input[name=mode]:checked").value;
+  const p = P();
+  $("vN").textContent = p.N; $("vD").textContent = p.D; $("vO").textContent = p.O;
+  tl = build(mode, p); cur = 0;
+  $("modeInfo").textContent = INFO[mode];
+  $("mem").innerHTML = Array.from({length: p.N}, (_, i) => "<span>" + i + "</span>").join("");
+  $("tl").innerHTML = tl.map(() => "<i></i>").join("");
+  compare(p); render();
+}
+
+function render(){
+  const e = cur ? tl[cur - 1] : null, p = P();
+  const words = tl.slice(0, cur).reduce((m, x) => Math.max(m, x.store), 0);
+  const moving = e && e.store && e.store === words;
+
+  $("nCpu").className = "node " + (e ? e.cpu : "");
+  $("nDma").className = "node " + (mode !== "dma" ? "hide" : e ? (e.cpu === "stall" ? "xfer" : e.cpu === "setup" ? "setup" : "") : "");
+  $("nDev").className = "node " + (e ? (e.dev === "ready" ? "xfer" : e.dev === "prep" ? "work" : "") : "");
+  $("nMem").className = "node " + (moving ? "xfer" : "");
+
+  $("tCpu").textContent = e ? CPU_TXT[e.cpu] : "Idle";
+  $("tDma").textContent = mode !== "dma" ? "Not used" : e && e.cpu === "stall" ? "Moving a word" : cur ? "Waiting" : "Idle";
+  $("tDev").textContent = e ? DEV_TXT[e.dev] : "Idle";
+  $("tMem").textContent = words + " of " + p.N + " words stored";
+
+  [...$("mem").children].forEach((c, i) => c.className = i < words ? "full" : "");
+  [...$("tl").children].forEach((c, i) => {
+    c.style.background = i < cur ? "var(" + COL[tl[i].cpu] + ")" : "";
+    c.className = i === cur - 1 ? "cur" : "";
+  });
+
+  $("now").style.borderLeftColor = e ? "var(" + COL[e.cpu] + ")" : "";
+  $("now").innerHTML = e ? "<b>Cycle " + cur + ":</b> " + e.msg : "Press <b>Step</b> to run one clock cycle, or <b>Play</b> to run automatically.";
+  if(cur === tl.length) $("now").innerHTML += "<br><b>Transfer complete.</b> All " + p.N + " words are in memory.";
+
+  const s = stats(tl, cur);
+  $("sCyc").textContent = s.cyc; $("sWords").textContent = words;
+  $("sWork").textContent = s.work; $("sEff").textContent = s.eff + "%";
+  $("bStep").disabled = cur >= tl.length;
+}
+
+function compare(p){
+  const rows = ["pio", "int", "dma"].map(m => { const t = build(m, p); return Object.assign({m}, stats(t, t.length)); });
+  const bestEff = Math.max(...rows.map(r => r.eff)), bestCyc = Math.min(...rows.map(r => r.cyc));
+  $("cmp").innerHTML = rows.map(r =>
+    "<tr><td>" + NAMES[r.m] + "</td>" +
+    "<td class='" + (r.cyc === bestCyc ? "best" : "") + "'>" + r.cyc + "</td>" +
+    "<td>" + r.work + "</td>" +
+    "<td class='" + (r.eff === bestEff ? "best" : "") + "'>" + r.eff + "%</td></tr>").join("");
+}
+
+function step(){ if(cur < tl.length){ cur++; render(); } if(cur >= tl.length) stop(); }
+function stop(){ clearInterval(timer); timer = null; $("bPlay").textContent = "Play"; }
+function play(){
+  if(timer){ stop(); return; }
+  if(cur >= tl.length) cur = 0;
+  $("bPlay").textContent = "Pause";
+  timer = setInterval(step, 500);
+}
+
+$("bStep").onclick = step;
+$("bPlay").onclick = play;
+$("bReset").onclick = reset;
+["N", "D", "O"].forEach(k => $(k).oninput = reset);
+document.querySelectorAll("input[name=mode]").forEach(r => r.onchange = reset);
+reset();
+</script>
+</body>
+</html>
